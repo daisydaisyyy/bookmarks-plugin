@@ -60,7 +60,8 @@ function get_bookmarks()
   return bookmarks
 end
 
-function new_bookmark_silent(name)
+-- INFO: add new bookmark
+function new_bookmark(name)
   local structure = app.getDocumentStructure()
   local activeLayer = structure.pages[structure.currentPage].currentLayer
   
@@ -77,14 +78,16 @@ function new_bookmark_silent(name)
 end
 
 function new_bookmark(name)
-  new_bookmark_silent(name)
+  new_bookmark(name)
   app.msgbox("Bookmark created", {[1]="OK"})
 end
 
+-- INFO: quick add new bookmark, without showing the dialog
 function new_bookmark_quick()
-  new_bookmark_silent("")
+  new_bookmark("")
 end
 
+-- INFO: delete a bookmark
 function delete_layer(page, layerID)
   local structure = app.getDocumentStructure()
   if page < 1 or page > #structure.pages then return end
@@ -124,11 +127,13 @@ function search_bookmark(mode)
   end
 end
 
+-- INFO: dialog to create a bookmark
 function dialog_new_bookmark()
   local out, code = run_yad('yad --entry --title="New Bookmark" --text="Name (use / for hierarchy):"')
   if code == 0 and out and out ~= "" then new_bookmark(out) end
 end
 
+-- INFO: build list
 function build_hierarchical_list(bookmarks)
   local tree = {}
   for _, bm in ipairs(bookmarks) do
@@ -166,6 +171,7 @@ function build_hierarchical_list(bookmarks)
   return flat_list
 end
 
+-- INFO: view bookmarks list
 function view_bookmarks()
   local bookmarks = get_bookmarks()
   if #bookmarks == 0 then return end
@@ -222,7 +228,7 @@ function view_bookmarks()
         else
           delete_layer(selected.page, selected.layerID)
           app.setCurrentPage(newPage)
-          new_bookmark_silent(n_str)
+          new_bookmark(n_str)
         end
       end
     end
@@ -244,6 +250,7 @@ function view_bookmarks()
   end
 end
 
+-- INFO: export bookmarks to JSON
 function export_bookmarks_to_file()
   local bookmarks = get_bookmarks()
   if #bookmarks == 0 then return end
@@ -263,6 +270,7 @@ function export_bookmarks_to_file()
   end
 end
 
+-- INFO: import bookmarks from JSON
 function import_bookmarks_from_file()
   local filename, code = run_yad('yad --file --title="Import"')
   if code ~= 0 or not filename then return end
@@ -278,7 +286,7 @@ function import_bookmarks_from_file()
     local page = tonumber(page_str)
     if page and page >= 1 and page <= numPages then
       app.setCurrentPage(page)
-      new_bookmark_silent(name_str)
+      new_bookmark(name_str)
     end
   end
 end
@@ -291,9 +299,13 @@ function export_import_bookmarks()
   elseif action == "Import Bookmarks" then import_bookmarks_from_file() end
 end
 
+-- INFO: pdf export
 function export()
   local pdftk_check, _ = run_yad("which pdftk 2>/dev/null")
-  if not pdftk_check or pdftk_check == "" then return end
+  if not pdftk_check or pdftk_check == "" then 
+    app.msgbox("pdftk not found.", {[1]="OK"})
+    return 
+  end
   
   local structure = app.getDocumentStructure()
   local bookmarks = get_bookmarks()
@@ -310,22 +322,47 @@ function export()
   local tempPdf = tempData .. "_tmp.pdf"
   
   app.export({outputFile = tempPdf})
+  
+  -- pdf metadata
   os.execute("pdftk " .. bash_escape(tempPdf) .. " dump_data output " .. bash_escape(tempData))
   
   local file = io.open(tempData, "a+")
-  for _, bm in ipairs(bookmarks) do
-    local level = select(2, bm.display_name:gsub("/", "")) + 1
-    local parts = {}
-    for part in bm.display_name:gmatch("[^/]+") do table.insert(parts, part) end
-    local short_name = utf8_to_html(parts[#parts] or "Bookmark")
+  
+  -- track parents, avoid duplicates
+  local written_paths = {}
+
+for _, bm in ipairs(bookmarks) do
+  local parts = {}
+  for part in bm.display_name:gmatch("[^/]+") do table.insert(parts, part) end
+  
+  local current_path = ""
+  for i, part in ipairs(parts) do
+    local is_last = (i == #parts)
+    if i > 1 then current_path = current_path .. "/" end
+    current_path = current_path .. part
     
-    file:write("BookmarkBegin\nBookmarkTitle: " .. short_name .. "\nBookmarkLevel: " .. level .. "\nBookmarkPageNumber: " .. bm.page .. "\n")
+    -- write bookmark only if not already existing
+    if not written_paths[current_path] then
+      file:write("BookmarkBegin\n")
+      file:write("BookmarkTitle: " .. utf8_to_html(part) .. "\n")
+      file:write("BookmarkLevel: " .. i .. "\n")
+      file:write("BookmarkPageNumber: " .. bm.page .. "\n")
+      
+      -- mark as existing
+      written_paths[current_path] = true
+    end
   end
+end
+  
   file:close()
   
+  -- new metadata
   os.execute("pdftk " .. bash_escape(tempPdf) .. " update_info " .. bash_escape(tempData) .. " output " .. bash_escape(path))
+  
+  -- cleaning
   os.remove(tempData)
   os.remove(tempPdf)
+  app.msgbox("Exported successfully", {[1]="OK"})
 end
 
 function initUi()
