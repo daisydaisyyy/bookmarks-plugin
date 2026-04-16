@@ -1,6 +1,6 @@
 # Bookmarks plugin
 
-A plugin for [**Xournal++**](https://github.com/xournalpp/xournalpp) to add bookmarks and export PDF files with native chapters.
+A plugin for [**Xournal++**](https://github.com/xournalpp/xournalpp) to add bookmarks and export PDF files with embedded chapters.
 
 The interface is managed using `yad`.
 
@@ -11,10 +11,10 @@ The interface is managed using `yad`.
 
 ## Dependencies
 - [yad](https://github.com/v1cont/yad)
-- [pdftk](https://www.pdflabs.com/tools/pdftk-the-pdf-toolkit/)
+- [pdftk](https://www.pdflabs.com/tools/pdftk-the-pdf-toolkit/) (required only for PDF export)
 
 ## Installation
-1. Copy `main.lua`, `plugin.ini`, and `utf8_to_html.lua` to your Xournal++ plugins folder:
+1. Copy `bookmarks-plugin` folder to your Xournal++ plugins folder:
    - **Linux**: `~/.config/xournalpp/plugins/`
    - **Windows**: `%AppData%\xournalpp\plugins\`
 2. Restart Xournal++
